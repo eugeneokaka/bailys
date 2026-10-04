@@ -1,5 +1,7 @@
-const express = require('express');
-const wa = require('./whatsapp');
+import express from 'express';
+import { connect, sendMessage, checkNumber, isReady } from './whatsapp.js';
+
+const HELLO_TEXT = 'lets plan';
 
 const app = express();
 app.use(express.json());
@@ -24,18 +26,18 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ ok: true, ready: wa.isReady() });
+  res.json({ ok: true, ready: isReady() });
 });
 
 app.get('/check', async (req, res) => {
   if (!req.query.to) {
     return res.status(400).json({ error: 'query param "to" is required' });
   }
-  if (!wa.isReady()) {
+  if (!isReady()) {
     return res.status(503).json({ error: 'WhatsApp not connected yet' });
   }
   try {
-    res.json(await wa.checkNumber(req.query.to));
+    res.json(await checkNumber(req.query.to));
   } catch (err) {
     console.error('check failed:', err.message);
     res.status(500).json({ error: err.message });
@@ -47,12 +49,12 @@ app.get('/hello', async (req, res) => {
   if (!to) {
     return res.status(400).json({ error: 'query param "to" is required' });
   }
-  if (!wa.isReady()) {
+  if (!isReady()) {
     return res.status(503).json({ error: 'WhatsApp not connected yet' });
   }
   try {
-    const id = await wa.sendMessage(to, 'nothing much');
-    res.json({ ok: true, to, message: 'hello', id });
+    const id = await sendMessage(to, HELLO_TEXT);
+    res.json({ ok: true, to, message: HELLO_TEXT, id });
   } catch (err) {
     if (err.code === 'NOT_ON_WHATSAPP') {
       return res.status(422).json({ error: err.message, code: err.code });
@@ -67,11 +69,11 @@ app.post('/send', async (req, res) => {
   if (!to || !message) {
     return res.status(400).json({ error: 'to and message are required' });
   }
-  if (!wa.isReady()) {
+  if (!isReady()) {
     return res.status(503).json({ error: 'WhatsApp not connected yet' });
   }
   try {
-    const id = await wa.sendMessage(to, message, { check: check !== false });
+    const id = await sendMessage(to, message, { check: check !== false });
     res.json({ ok: true, id });
   } catch (err) {
     if (err.code === 'NOT_ON_WHATSAPP') {
@@ -84,7 +86,7 @@ app.post('/send', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-wa.connect().catch((err) => console.error('connect failed:', err));
+connect().catch((err) => console.error('connect failed:', err));
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
